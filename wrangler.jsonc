@@ -5,21 +5,19 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "share-tool",
-	"main": "src/index.ts",
+	"main": "src/server/index.ts",
 	"compatibility_date": "2026-01-01",
 	"migrations": [
 		{
-			"new_sqlite_classes": [
-				"MyDurableObject"
-			],
-			"tag": "v1"
+			"tag": "v1",
+			 "new_classes": ["Room"]
 		}
 	],
 	"durable_objects": {
 		"bindings": [
 			{
-				"class_name": "MyDurableObject",
-				"name": "MY_DURABLE_OBJECT"
+				"class_name": "Room",
+				"name": "ROOMS"
 			}
 		]
 	},
