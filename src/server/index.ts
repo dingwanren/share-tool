@@ -11,18 +11,21 @@
  * Learn more at https://developers.cloudflare.com/durable-objects
  */
 
+import { DurableObject } from 'cloudflare:workers';
+// 导入 Supabase 客户端创建函数
+import { createClient } from '@supabase/supabase-js';
+
 // import { Room } from './durable-objects/Room';
 // 拆分的话,为啥这里要定义 Env, worker-configuration.d.ts 不是有声明吗
 // export interface Env {
 //   ROOMS: DurableObjectNamespace<Room>;
 // }
 
-import { DurableObject } from "cloudflare:workers";
-
 export class Room extends DurableObject<Env> {
-	private clients: Set<WebSocket>
- 	private roomId: string;
+	private clients: Set<WebSocket>;
+	private roomId: string;
 	private createdAt: number;
+	private supabase: any; // 用于存储 Supabase 客户端实例
 
 	/**
 	 * The constructor is invoked once upon creation of the Durable Object, i.e. the first call to
@@ -34,58 +37,106 @@ export class Room extends DurableObject<Env> {
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
 		// 获取此Durable Object实例的唯一ID并转换为字符串
-    this.roomId = ctx.id.toString();
+		this.roomId = ctx.id.toString();
 
-		this.clients = new Set()
-		this.createdAt = Date.now()
+		this.clients = new Set();
+		this.createdAt = Date.now();
+  	console.log('调试: SUPABASE_URL=', env.SUPABASE_URL); // 添加这行
+    console.log('调试: SUPABASE_ANON_KEY 前几位=', env.SUPABASE_ANON_KEY?.substring(0, 10)); // 安全地打印密钥前几位
+		// 初始化 Supabase 客户端
+		// 注意：你需要提前将 SUPABASE_URL 和 SUPABASE_ANON_KEY 通过 wrangler secret put 命令设置好
+		this.supabase = createClient(
+			env.SUPABASE_URL, // 从环境变量读取
+			env.SUPABASE_ANON_KEY // 从环境变量读取
+		);
 		console.log(`房间 ${this.roomId} 已创建或初始化`);
 	}
 
-	async fetch(request: Request) : Promise<Response> {
+	async fetch(request: Request): Promise<Response> {
 		// 1. 检查请求是否为WebSocket升级请求
-		const upgradeHeader = request.headers.get('Upgrade')
+		const upgradeHeader = request.headers.get('Upgrade');
 
 		if (upgradeHeader === 'websocket') {
- 			// 2. 接受WebSocket连接
-			const webSocketPair = new WebSocketPair()
-			const [client, server] = Object.values(webSocketPair)
+			// 2. 接受WebSocket连接
+			const webSocketPair = new WebSocketPair();
+			const [client, server] = Object.values(webSocketPair);
 
 			// 3. 处理这个新连接（保存、设置监听器）
-      await this.handleWebSocketSession(server);
+			await this.handleWebSocketSession(server);
 
 			// 4. 返回101响应，完成握手，将client端返回给前端
-      return new Response(null, {
-        status: 101,
-        webSocket: client, // 这个client就是前端的WebSocket对象
-      });
+			return new Response(null, {
+				status: 101,
+				webSocket: client, // 这个client就是前端的WebSocket对象
+			});
 		}
 
-		 // 如果不是WebSocket请求，可以返回404或房间信息
-    return new Response('请使用WebSocket协议连接', { status: 400 });
+		// 如果不是WebSocket请求，可以返回404或房间信息
+		return new Response('请使用WebSocket协议连接', { status: 400 });
 	}
 
-	async handleWebSocketSession (webSocket: WebSocket) {
-		webSocket.accept() // 1. 接受连接
-		this.clients.add(webSocket) // 2. 保存到客户端列表
+	async handleWebSocketSession(webSocket: WebSocket) {
+		webSocket.accept(); // 1. 接受连接
+		this.clients.add(webSocket); // 2. 保存到客户端列表
 
 		// 3. 监听消息（后续用于广播文本/文件URL）
-		webSocket.addEventListener("message", (event) => {
- 			console.log(`房间 ${this.roomId} 收到消息:`, event.data);
-      // 这里暂时只打印，后续会实现广播
-		})
+		webSocket.addEventListener('message', async (event) => {
+			console.log(`房间 ${this.roomId} 收到消息:`, event.data);
+			// 这里暂时只打印，后续会实现广播
+
+			// 解析消息（假设是JSON）
+			let message;
+			try {
+				message = JSON.parse(event.data);
+			} catch {
+				// 如果不是JSON，按纯文本处理
+				message = { type: 'text', content: event.data };
+			}
+
+			const dbInsertData = {
+				room_id: this.roomId, // 使用 Durable Object 实例ID作为房间标识
+				type: message.type, // 'text' 或 'file'
+				content: message.content, // 文本内容或文件URL
+				file_name: message.file_name || null, // 文件名，是文本就没有, 如果没有则为 null
+			};
+
+			// 插入数据库
+			const { data, error } = await this.supabase.from('messages').insert(dbInsertData);
+
+			if (error) {
+				// 处理错误（记录日志，但不应该阻断实时广播）
+				console.error('插入消息到数据库失败:', error.message);
+			} else {
+				console.log('消息已持久化到数据库，ID:', data[0]?.id);
+			}
+			// 广播给房间内所有其他客户端
+			this.broadcast(message, webSocket); // 需要实现broadcast方法
+		});
 
 		webSocket.addEventListener('close', (event) => {
-			this.clients.delete(webSocket)
+			this.clients.delete(webSocket);
 			console.log(`一个连接关闭，房间 ${this.roomId} 剩余连接: ${this.clients.size}`);
-		})
+		});
 
 		// 5. 可选：发送一个欢迎消息
-    webSocket.send(JSON.stringify({
-      type: 'system',
-      message: `已成功加入房间 ${this.roomId}`
-    }));
-  }
+		webSocket.send(
+			JSON.stringify({
+				type: 'system',
+				message: `已成功加入房间 ${this.roomId}`,
+			})
+		);
+	}
+	// 广播方法
+	private async broadcast(message: any, sender: WebSocket) {
+		const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
 
+		this.clients.forEach((client) => {
+			// 不发送给消息来源者（除非需要回显）
+			if (client !== sender && client.readyState === WebSocket.READY_STATE_OPEN) {
+				client.send(messageStr);
+			}
+		});
+	}
 
 	/**
 	 * The Durable Object exposes an RPC method sayHello which will be invoked when a Durable
@@ -97,9 +148,7 @@ export class Room extends DurableObject<Env> {
 	async sayHello(name: string): Promise<string> {
 		return `Heaaallio, ${name}!`;
 	}
-
 }
-
 
 export default {
 	/**
@@ -111,18 +160,18 @@ export default {
 	 * @returns The response to be sent back to the client
 	 */
 	async fetch(request, env, ctx): Promise<Response> {
-		const url = new URL(request.url)
-		const roomName = url.searchParams.get("roomName")
+		const url = new URL(request.url);
+		const roomName = url.searchParams.get('roomName');
 
 		if (roomName) {
-      // 根据房间名生成确定性ID
-      const roomObj = env.ROOMS.getByName(roomName);
-      // 获取该ID对应的Durable Object实例的“桩”(stub)
-      // 将整个请求（包括WebSocket升级头）转发给房间实例处理
-      return roomObj.fetch(request);
-    }
+			// 根据房间名生成确定性ID
+			const roomObj = env.ROOMS.getByName(roomName);
+			// 获取该ID对应的Durable Object实例的“桩”(stub)
+			// 将整个请求（包括WebSocket升级头）转发给房间实例处理
+			return roomObj.fetch(request);
+		}
 
 		// 3. 如果没有房间名，可以返回一个简单提示或前端页面
-    return new Response('请提供房间名 (例如 ?roomName=你的房间码)', { status: 400 });
+		return new Response('请提供房间名 (例如 ?roomName=你的房间码)', { status: 400 });
 	},
 } satisfies ExportedHandler<Env>;
