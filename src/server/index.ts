@@ -41,8 +41,8 @@ export class Room extends DurableObject<Env> {
 
 		this.clients = new Set();
 		this.createdAt = Date.now();
-  	console.log('调试: SUPABASE_URL=', env.SUPABASE_URL); // 添加这行
-    console.log('调试: SUPABASE_ANON_KEY 前几位=', env.SUPABASE_ANON_KEY?.substring(0, 10)); // 安全地打印密钥前几位
+		console.log('调试: SUPABASE_URL=', env.SUPABASE_URL); // 添加这行
+		console.log('调试: SUPABASE_ANON_KEY 前几位=', env.SUPABASE_ANON_KEY?.substring(0, 10)); // 安全地打印密钥前几位
 		// 初始化 Supabase 客户端
 		// 注意：你需要提前将 SUPABASE_URL 和 SUPABASE_ANON_KEY 通过 wrangler secret put 命令设置好
 		this.supabase = createClient(
@@ -161,6 +161,84 @@ export default {
 	 */
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
+
+		// 文件上传路由
+		if (url.pathname === '/api/upload' && request.method === 'POST') {
+			try {
+				// 1. 从请求中解析 FormData
+				const formData = await request.formData();
+				// 2. 获取文件字段（前端字段名需一致，例如 'file'）
+				const file = formData.get('file') as File;
+
+				if (!file) {
+					return new Response(JSON.stringify({ error: '未提供文件' }), {
+						status: 400,
+						headers: { 'Content-Type': 'application/json' },
+					});
+				}
+				// 3. 初始化 Supabase 客户端（使用 env 中的密钥）
+				const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+				// 4. 生成唯一文件名，避免冲突
+				const timestamp = Date.now();
+				const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+				const uniqueFileName = `public/${timestamp}_${safeFileName}`;
+
+				// 5. 上传到 Supabase Storage 的 'shared-files' 桶
+				const { data: uploadData, error: uploadError } = await supabase.storage.from('shared-files').upload(uniqueFileName, file, {
+					contentType: file.type,
+					cacheControl: '3600', // 缓存控制可选
+				});
+
+				if (uploadError) {
+					throw new Error(`存储上传失败: ${uploadError.message}`);
+				}
+
+				// 6. 获取文件的公开访问 URL
+				const {
+					data: { publicUrl },
+				} = supabase.storage.from('shared-files').getPublicUrl(uploadData.path);
+
+				// 7. 返回成功响应（包含前端广播所需的所有信息）
+				return new Response(
+					JSON.stringify({
+						success: true,
+						url: publicUrl,
+						name: file.name,
+						size: file.size,
+						type: file.type,
+					}),
+					{
+						headers: { 'Content-Type': 'application/json' },
+					}
+				);
+			} catch (error) {
+				let errorMessage = '上传处理失败';
+				// 1. 检查 error 是否为 Error 对象
+				if (error instanceof Error) {
+					errorMessage = error.message;
+				}
+				// 2. 检查 error 是否为普通对象且有 message 属性
+				else if (error && typeof error === 'object' && 'message' in error) {
+					errorMessage = String((error as any).message);
+				}
+				// 3. 如果是其他类型（如字符串），直接转换
+				else if (typeof error === 'string') {
+					errorMessage = error;
+				}
+
+				return new Response(
+					JSON.stringify({
+						error: '上传处理失败',
+						details: errorMessage, // error.message 会提示错误 'error' is of type 'unknown', 上面那一串是为了解决它,ai教的
+					}),
+					{
+						status: 500,
+						headers: { 'Content-Type': 'application/json' },
+					}
+				);
+			}
+		}
+
 		const roomName = url.searchParams.get('roomName');
 
 		if (roomName) {
