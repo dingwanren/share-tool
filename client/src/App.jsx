@@ -65,7 +65,16 @@ function App() {
     if (socketRef.current) {
       socketRef.current.close();
     }
-		const ws = new WebSocket(`ws://${window.location.host}/ws?roomName=${roomName}`)
+		 // 1. 动态获取当前页面的协议（http: 或 https:）
+		const protocol = window.location.protocol; // 返回 "http:" 或 "https:"
+
+		// 2. 根据协议决定使用 ws:// 还是 wss://
+		//    规则：http -> ws, https -> wss
+		const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+
+		// 3. 构造正确的 WebSocket URL
+		const wsUrl = `${wsProtocol}//${window.location.host}/ws?roomName=${encodeURIComponent(roomName)}`;
+		const ws = new WebSocket(wsUrl)
 		socketRef.current = ws
 
 		ws.onopen = () => {
