@@ -1,0 +1,411 @@
+/* shadcn UI 风格的聊天界面样式 */
+:root {
+  /* 颜色变量 - shadcn UI 浅色主题 */
+  --background: 0 0% 100%;
+  --foreground: 222.2 47.4% 11.2%;
+
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47.4% 11.2%;
+
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 47.4% 11.2%;
+
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+
+  --destructive: 0 100% 50%;
+  --destructive-foreground: 210 40% 98%;
+
+  --ring: 215 20.2% 65.1%;
+
+  --radius: 0.5rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px; /* 标准字体大小 */
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* 防止出现滚动条 */
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 800px; /* 类似vite文档的宽度 */
+  margin: 0 auto; /* 水平居中 */
+  padding: 0;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  box-sizing: border-box;
+  overflow: hidden; /* 防止出现滚动条 */
+}
+
+/* 加入房间界面 */
+.join-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 0; /* 移除padding */
+  gap: 1rem;
+  box-sizing: border-box;
+}
+
+.join-screen input {
+  padding: 0.75rem 1rem;
+  border: 1px solid hsl(var(--input));
+  border-radius: var(--radius);
+  font-size: 1rem;
+  width: 300px;
+  max-width: 100%;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  box-sizing: border-box;
+}
+
+.join-screen button {
+  padding: 0.75rem 1.5rem;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.join-screen button:hover {
+  opacity: 0.9;
+}
+
+/* 房间界面 */
+.room-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 0; /* 移除padding */
+  box-sizing: border-box;
+  overflow: hidden; /* 防止出现滚动条 */
+}
+
+/* 房间头部 */
+.room-header {
+  padding: 1rem;
+  text-align: center; /* 居中对齐 */
+  font-size: 1.25rem;
+  font-weight: 600;
+  border-bottom: 1px solid hsl(var(--border));
+  flex-shrink: 0; /* 防止压缩 */
+}
+
+/* 消息列表 */
+.message-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* 隐藏滚动条但保持功能 */
+.message-list::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera*/
+}
+
+/* 消息项样式 */
+.message {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  background-color: hsl(var(--card));
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  max-width: 80%;
+  word-wrap: break-word;
+  align-self: flex-start;
+}
+
+.message.text-message {
+  background-color: hsl(var(--card));
+}
+
+.message.file-message {
+  background-color: hsl(var(--secondary));
+}
+
+.message.system-message {
+  background-color: hsl(var(--muted));
+  align-self: center;
+  text-align: center;
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
+  max-width: fit-content;
+}
+
+.message .content {
+  margin-bottom: 0.25rem;
+  font-size: 16px; /* 正文大小 */
+}
+
+.message .file-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.message .file-name {
+  font-weight: 500;
+  font-size: 16px; /* 文件名大小 */
+}
+
+.message .file-size {
+  color: hsl(var(--muted-foreground));
+  font-size: 14px; /* 小一号字体 */
+}
+
+.message .file-link {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  text-decoration: none;
+  border-radius: calc(var(--radius) * 0.5);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.message .meta {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 14px; /* 时间比正文小一号 */
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.25rem;
+}
+
+/* 操作区域 */
+.operation-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid hsl(var(--border));
+  flex-shrink: 0; /* 防止压缩 */
+}
+
+/* 已选文件预览 */
+.selected-files-preview {
+  background-color: hsl(var(--secondary));
+  border: 1px solid hsl(var(--border));
+  border-top: none; /* 与textarea无缝连接 */
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 0.75rem;
+  margin-top: -1px; /* 与textarea无缝连接 */
+}
+
+.selected-files-preview h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+
+.selected-files-preview ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selected-files-preview li {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: calc(var(--radius) * 0.5);
+  background-color: hsl(var(--background));
+  margin-bottom: 0.25rem;
+}
+
+.selected-files-preview li:last-child {
+  margin-bottom: 0;
+}
+
+.selected-files-preview .file-info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selected-files-preview .file-name {
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+}
+
+.selected-files-preview .file-size {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.selected-files-preview button {
+  background-color: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border: none;
+  border-radius: calc(var(--radius) * 0.5);
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  margin-left: 0.5rem;
+}
+
+.selected-files-preview button:hover {
+  opacity: 0.9;
+}
+
+/* 输入和按钮区域 - 作为一个整体 */
+.input-textarea-container {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid hsl(var(--input));
+  border-radius: var(--radius);
+  overflow: hidden; /* 确保内部元素圆角与容器一致 */
+	padding: 0.75rem;
+}
+
+.input-textarea-container textarea {
+  width: 100%;
+  flex: 1;
+  border: none;
+  resize: none;
+  font-size: 16px;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  outline: none; /* 移除focus高亮描边 */
+  min-height: 80px;
+  box-sizing: border-box;
+}
+
+.input-textarea-container .button-row {
+  display: flex;
+  justify-content: flex-end; /* 按钮靠右 */
+  gap: 0.5rem;
+}
+
+.input-textarea-container .button-row button {
+  padding: 0.5rem 1rem;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.input-textarea-container .button-row button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.input-textarea-container .button-row button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input-textarea-container .button-row .file-button {
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+  }
+
+  .app-container {
+    height: 100vh;
+    max-width: 100%;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .room-screen {
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .room-header {
+    padding: 1rem;
+    font-size: 1.1rem;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .message-list {
+    flex: 1;
+    padding: 1rem;
+    overflow-y: auto;
+  }
+
+  .message {
+    max-width: 90%;
+    padding: 0.6rem;
+    font-size: 16px;
+  }
+
+  .operation-area {
+    padding: 1rem;
+    border-top: 1px solid hsl(var(--border));
+    flex-shrink: 0;
+  }
+
+  .input-textarea-container textarea {
+    min-height: 100px;
+    padding: 0.75rem;
+  }
+
+  .input-textarea-container .button-row {
+    padding: 0.75rem;
+  }
+
+  .selected-files-preview {
+    padding: 0.5rem;
+  }
+
+  .selected-files-preview li {
+    padding: 0.4rem;
+  }
+}
+
+/* 文件输入隐藏 */
+input[type="file"] {
+  display: none;
+}

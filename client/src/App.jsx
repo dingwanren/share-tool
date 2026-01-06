@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import './App.css'
+import './styles/chat.css'
 import './lib/supabase'
 import { supabase } from './lib/supabase'
 import MessageItem from './components/MessageItem'
@@ -205,50 +205,52 @@ function App() {
 						}
 					</div>
 					<div className='operation-area'>
-						<input type="text" value={msgText} onChange={(e) =>setMsgText(e.target.value)} />
-						<button type="button" onClick={() => {inputFileRef.current.click()}}>
-							文件
-							<input style={{display: 'none'}} ref={inputFileRef} type="file" multiple onChange={onFileChange} />
-						</button>
-						<button type="button" disabled={ !msgText && !selectedFiles.length } onClick={send}>send</button>
+						{/* 输入区域 - textarea和按钮作为一个整体 */}
+						<div className="input-textarea-container">
+							{/* 文件列表 - 在textarea上方 */}
+							{selectedFiles.length > 0 && (
+								<div className='selected-files-preview'>
+									<ul>
+										{selectedFiles.map((file, index) => (
+											<li key={`${file.name}-${index}`}>
+												<div className="file-info">
+													<span className="file-name">📄 {file.name}</span>
+													<span className="file-size">({(file.size / 1024).toFixed(1)} KB)</span>
+												</div>
+												<button onClick={() => removeFile(index)}>×</button>
+											</li>
+										))}
+									</ul>
+								</div>
+							)}
 
-						{/* 文件列表 */}
-						{selectedFiles.length > 0 && (
-							<div className='selected-files-preview'>
-								<h3>已选文件 ({selectedFiles.length})：</h3>
-								<ul style={{ listStyle: 'none', padding: 0 }}>
-									{selectedFiles.map((file, index) => (
-										<li
-											key={`${file.name}-${index}`} // 文件名+索引避免同名冲突
-											style={{
-												display: 'flex',
-												alignItems: 'center',
-												padding: '8px',
-												border: '1px solid #eee',
-												marginBottom: '4px',
-											}}
-										>
-											<span style={{ flex: 1 }}>
-												📄 {file.name} <small>({(file.size / 1024).toFixed(1)} KB)</small>
-											</span>
-											<button
-												onClick={() => removeFile(index)}
-												style={{
-													background: '#dc3545',
-													color: 'white',
-													border: 'none',
-													borderRadius: '4px',
-													padding: '2px 6px',
-													cursor: 'pointer',
-												}}
-											>
-												×
-											</button>
-										</li>
-									))}
-								</ul>
+							{/* 文本输入区域 */}
+							<textarea
+								value={msgText}
+								onChange={(e) => setMsgText(e.target.value)}
+								placeholder="输入消息..."
+								rows="3"
+							/>
+
+							{/* 按钮行 - 在textarea下方，靠右排列 */}
+							<div className="button-row">
+								<button
+									type="button"
+									className="file-button"
+									onClick={() => {inputFileRef.current.click()}}
+								>
+									文件
+									<input style={{display: 'none'}} ref={inputFileRef} type="file" multiple onChange={onFileChange} />
+								</button>
+								<button
+									type="button"
+									disabled={ !msgText && !selectedFiles.length }
+									onClick={send}
+								>
+									发送
+								</button>
 							</div>
-						)}
+						</div>
 					</div>
 				</div>
 			)}
