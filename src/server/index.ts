@@ -79,6 +79,15 @@ export class Room extends DurableObject<Env> {
 		webSocket.accept(); // 1. 接受连接
 		this.clients.add(webSocket); // 2. 保存到客户端列表
 
+		// 发送一个欢迎消息
+		webSocket.send(
+			JSON.stringify({
+				type: 'system',
+				roomId: this.roomId, // 前端将用这个ID查询历史
+				message: `已成功加入房间 ${this.roomId}`,
+			})
+		);
+
 		// 3. 监听消息（后续用于广播文本/文件URL）
 		webSocket.addEventListener('message', async (event) => {
 			console.log(`房间 ${this.roomId} 收到消息:`, event.data);
@@ -98,44 +107,45 @@ export class Room extends DurableObject<Env> {
 				type: message.type, // 'text' 或 'file'
 				content: message.content, // 文本内容或文件URL
 				file_name: message.file_name || null, // 文件名，是文本就没有, 如果没有则为 null
+				size: message.size || null
 			};
 
 			// 插入数据库
-			const { data, error } = await this.supabase.from('messages').insert(dbInsertData);
+			const { data: insertedData, error } = await this.supabase
+				.from('messages')
+				.insert(dbInsertData)
+				.select() // 关键：使用 .select() 获取插入后的完整数据
+				.single(); // 获取单条记录
 
 			if (error) {
-				// 处理错误（记录日志，但不应该阻断实时广播）
 				console.error('插入消息到数据库失败:', error.message);
-			} else {
-				console.log('消息已持久化到数据库，ID:', data[0]?.id);
+				return; // 插入失败，不再广播
 			}
+
+			console.log('消息已持久化到数据库，ID:', insertedData.id);
 			// 广播给房间内所有其他客户端
-			this.broadcast(message, webSocket); // 需要实现broadcast方法
+			this.broadcast(insertedData, webSocket);
 		});
 
 		webSocket.addEventListener('close', (event) => {
 			this.clients.delete(webSocket);
 			console.log(`一个连接关闭，房间 ${this.roomId} 剩余连接: ${this.clients.size}`);
 		});
-
-		// 5. 可选：发送一个欢迎消息
-		webSocket.send(
-			JSON.stringify({
-				type: 'system',
-				message: `已成功加入房间 ${this.roomId}`,
-			})
-		);
 	}
 	// 广播方法
 	private async broadcast(message: any, sender: WebSocket) {
 		const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
 
 		this.clients.forEach((client) => {
-			// 不发送给消息来源者（除非需要回显）
-			if (client !== sender && client.readyState === WebSocket.READY_STATE_OPEN) {
+			if (
+				// client !== sender && // 不发送给消息来源者（除非需要回显）
+				client.readyState === WebSocket.READY_STATE_OPEN
+			) {
 				client.send(messageStr);
 			}
 		});
+
+		console.log(`已广播消息给 ${this.clients.size} 个客户端`);
 	}
 
 	/**
