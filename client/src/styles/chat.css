@@ -140,21 +140,10 @@ body {
 .message {
   display: flex;
   flex-direction: column;
-  padding: 0.75rem;
-  border-radius: var(--radius);
   background-color: hsl(var(--card));
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   max-width: 80%;
   word-wrap: break-word;
   align-self: flex-start;
-}
-
-.message.text-message {
-  background-color: hsl(var(--card));
-}
-
-.message.file-message {
-  background-color: hsl(var(--secondary));
 }
 
 .message.system-message {
@@ -167,15 +156,21 @@ body {
 }
 
 .message .content {
-  margin-bottom: 0.25rem;
+  background-color: hsl(var(--card));
   font-size: 16px; /* 正文大小 */
+  padding: 0.5rem 0.75rem;
+	border-radius: var(--radius);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
 
 .message .file-info {
   display: flex;
+  background-color: hsl(var(--secondary));
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.25rem;
+  padding: 0.5rem 0.75rem;
+	border-radius: var(--radius);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
 
 .message .file-name {
@@ -191,7 +186,6 @@ body {
 .message .file-link {
   display: inline-block;
   padding: 0.25rem 0.5rem;
-  background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   text-decoration: none;
   border-radius: calc(var(--radius) * 0.5);
@@ -207,13 +201,49 @@ body {
   margin-top: 0.25rem;
 }
 
+/* Message actions container */
+.message-actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  font-size: 14px;
+  color: hsl(var(--muted-foreground));
+}
+
+.file-actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  font-size: 14px;
+  color: hsl(var(--muted-foreground));
+}
+
+.copy-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.copy-icon:hover {
+  background-color: hsl(var(--muted));
+}
+
 /* 操作区域 */
 .operation-area {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   padding: 1rem;
-  border-top: 1px solid hsl(var(--border));
   flex-shrink: 0; /* 防止压缩 */
 }
 
@@ -312,14 +342,10 @@ body {
   display: flex;
   justify-content: flex-end; /* 按钮靠右 */
   gap: 0.5rem;
+	align-items: center;
 }
 
 .input-textarea-container .button-row button {
-  padding: 0.5rem 1rem;
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border: none;
-  border-radius: var(--radius);
   font-size: 1rem;
   cursor: pointer;
   transition: opacity 0.2s;
@@ -335,8 +361,20 @@ body {
 }
 
 .input-textarea-container .button-row .file-button {
-  background-color: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
+	display: inline-flex;
+  background-color: unset;
+  color: hsl(var(--primary-foreground));
+  border: none;
+	padding: 0;
+}
+
+.input-textarea-container .button-row .send-button {
+	display: inline-flex;
+	padding: 0.5rem ;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: 50%;
 }
 
 /* 移动端适配 */
@@ -383,7 +421,6 @@ body {
 
   .operation-area {
     padding: 1rem;
-    border-top: 1px solid hsl(var(--border));
     flex-shrink: 0;
   }
 
