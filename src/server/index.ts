@@ -17,6 +17,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // import { Room } from './durable-objects/Room';
 // 拆分的话,为啥这里要定义 Env, worker-configuration.d.ts 不是有声明吗
+// 不需要,env配置了,再跑一次生成类型,配置文件就有了
 // export interface Env {
 //   ROOMS: DurableObjectNamespace<Room>;
 // }
@@ -24,7 +25,6 @@ import { createClient } from '@supabase/supabase-js';
 export class Room extends DurableObject<Env> {
 	private clients: Set<WebSocket>;
 	private roomId: string;
-	private createdAt: number;
 	private supabase: any; // 用于存储 Supabase 客户端实例
 
 	/**
@@ -40,7 +40,6 @@ export class Room extends DurableObject<Env> {
 		this.roomId = ctx.id.toString();
 
 		this.clients = new Set();
-		this.createdAt = Date.now();
 		console.log('调试: SUPABASE_URL=', env.SUPABASE_URL); // 添加这行
 		console.log('调试: SUPABASE_ANON_KEY 前几位=', env.SUPABASE_ANON_KEY?.substring(0, 10)); // 安全地打印密钥前几位
 		// 初始化 Supabase 客户端
@@ -78,6 +77,31 @@ export class Room extends DurableObject<Env> {
 	async handleWebSocketSession(webSocket: WebSocket) {
 		webSocket.accept(); // 1. 接受连接
 		this.clients.add(webSocket); // 2. 保存到客户端列表
+
+		/**创建房间记录 */
+		const { error: insertError } = await this.supabase
+		  .from('rooms')
+			.insert({
+				id: this.roomId,
+				last_message_at: new Date().toISOString(),
+				created_at: new Date().toISOString()
+			})
+			.select()
+    	.maybeSingle();
+
+		if (insertError && insertError.code === '23505') {
+			// 23505,代表冲突错误, 如果是冲突错误，只更新时间（房间已存在）
+			await this.supabase
+			  .from('rooms')
+				.update({ last_message_at: new Date().toISOString() })
+				.eq('id', this.roomId)
+
+			console.log(`房间 ${this.roomId} 已激活`);
+		} else if (insertError) {
+			console.error(`创建房间失败:`, insertError);
+		} else {
+			console.log(`房间 ${this.roomId} 已创建`);
+		}
 
 		// 发送一个欢迎消息
 		webSocket.send(
@@ -123,6 +147,17 @@ export class Room extends DurableObject<Env> {
 			}
 
 			console.log('消息已持久化到数据库，ID:', insertedData.id);
+
+			// 有消息就更新房间最后活动时间
+			const { error: updateError } = this.supabase
+			  .from('rooms')
+				.update({ last_message_at: new Date().toISOString() })
+				.eq('id', this.roomId)
+
+			if (updateError) {
+				console.error(`更新房间 ${this.roomId} 活动时间失败:`, updateError);
+			}
+
 			// 广播给房间内所有其他客户端
 			this.broadcast(insertedData, webSocket);
 		});

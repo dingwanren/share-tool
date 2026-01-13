@@ -71,6 +71,7 @@ function App() {
 		});
 	}
 	const joinRoom = (roomToJoin) => {
+		setIsJoining(true);
 		console.log(`roomToJoin: ${roomToJoin}`, `roomName: ${roomName}`)
 
 		// 如果已有连接，先关闭
@@ -121,7 +122,6 @@ function App() {
 	const handleJoinClick = () => {
 		if (isJoining) return;
 
-		setIsJoining(true);
 		joinRoom(roomName)
 	}
 

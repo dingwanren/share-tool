@@ -167,6 +167,6 @@ dist
 .wrangler/
 
 
-public/
+/public
 dist/
 build/
