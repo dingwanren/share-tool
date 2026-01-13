@@ -195,6 +195,124 @@ export class Room extends DurableObject<Env> {
 	}
 }
 
+function extractStoragePath(publicUrl: string): string | null {
+  try {
+    const url = new URL(publicUrl);
+    // 假设URL格式：.../storage/v1/object/public/shared-files/public/filename.png
+    const pathSegments = url.pathname.split('/');
+    const bucketIndex = pathSegments.findIndex(seg => seg === 'shared-files');
+
+    if (bucketIndex !== -1 && bucketIndex + 1 < pathSegments.length) {
+      // 返回 bucket-name 之后的部分
+      return pathSegments.slice(bucketIndex + 1).join('/');
+    }
+  } catch (e) {
+    console.warn(`[Cleanup] 无法解析URL: ${publicUrl}`, e);
+  }
+  return null;
+}
+
+async function executeCleanup(env: Env) {
+  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+	const expiryHours = 2; // 2小时过期
+	console.log(`[Cleanup] 开始执行，过期阈值：${expiryHours}小时`);
+
+	try {
+		// 1.计算过期时间点
+		const expiryThreshold = new Date(Date.now() - expiryHours * 60 * 60 * 1000).toISOString();
+		console.log(`[Cleanup] 过期时间点: ${expiryThreshold}`);
+
+		// 2.查询过期房间, 房间最后活动时间 早于 当前时刻两小时前 的话,即过期
+		const { data: expiredRooms, error: roomsError } = await supabase
+		  .from('rooms')
+			.select('id, last_message_at')
+			.lt('last_message_at', expiryThreshold)
+
+		if (roomsError) {
+			throw new Error(`查询过期房间失败: ${roomsError.message}`);
+		}
+
+		if (!expiredRooms || expiredRooms.length === 0) {
+			console.log('[Cleanup] 未找到过期的房间。');
+      return;
+		}
+
+		const roomIds: string[] = expiredRooms.map(room => room.id)
+		console.log(`[Cleanup] 找到 ${roomIds.length} 个过期房间: ${roomIds.join(', ')}`);
+
+		// 3.查询这些过期房间的所有文件类型消息
+		const { data: fileMessages, error: messagesError  } = await supabase
+			.from('messages')
+			.select('id, content')
+			.in('room_id', roomIds)
+			.eq('type', 'file')
+
+		if (messagesError) {
+ 			throw new Error(`查询文件消息失败: ${messagesError.message}`);
+		}
+
+		// 4.解析并收集需要删除的Storage文件路径
+		const filesToDelete = [] as string[];
+		const messageIdsToDelete = [] as number[];
+
+		if (fileMessages && fileMessages.length > 0) {
+			console.log(`[Cleanup] 找到 ${fileMessages.length} 个待清理文件`);
+
+			fileMessages.forEach(msg => {
+				const path  = extractStoragePath(msg.content);
+
+				if (path) {
+					filesToDelete.push(path)
+					messageIdsToDelete.push(msg.id)
+				}
+			})
+
+			// 5.删除存储桶的文件
+			if (filesToDelete.length > 0) {
+				console.log(`[Cleanup] 删除Storage文件: ${filesToDelete.join(', ')}`);
+
+				const { error: storageError  } = await supabase.storage
+					.from('shared-files')
+					.remove(filesToDelete)
+
+				if (storageError) {
+					// Storage错误不影响后续数据库清理
+          console.error(`[Cleanup] 删除文件失败（继续清理数据库）:`, storageError);
+				} else {
+          console.log(`[Cleanup] 已删除 ${filesToDelete.length} 个文件`);
+        }
+			}
+		}
+
+		// 6. 删除message记录(文本和文件),roomid直接删
+		const { error: deleteMsgsError }  = await supabase
+			.from('messages')
+			.delete()
+			.in('room_id', roomIds)
+
+		if (deleteMsgsError) {
+			throw new Error(`删除消息记录失败: ${deleteMsgsError.message}`);
+		}
+		console.log(`[Cleanup] 已删除过期房间的所有消息`);
+
+
+		// 7.删除房间记录
+		const { error: deleteRoomsError } = await supabase
+		  .from('rooms')
+			.delete()
+			.in('id', roomIds)
+
+		if (deleteRoomsError) {
+			throw new Error(`删除房间记录失败: ${deleteRoomsError.message}`);
+		}
+		console.log(`[Cleanup] 已删除 ${roomIds.length} 个房间记录`);
+		console.log(`[Cleanup] 任务完成！`);
+    console.log(`[Cleanup] 统计: ${roomIds.length} 房间, ${fileMessages?.length || 0} 文件, ${messageIdsToDelete.length} 文件消息`);
+	} catch (error) {
+		console.error('[Cleanup] 清理任务失败:', error);
+	}
+}
+
 export default {
 	/**
 	 * This is the standard fetch handler for a Cloudflare Worker
@@ -297,4 +415,9 @@ export default {
 		// 3. 如果没有房间名，可以返回一个简单提示或前端页面
 		return new Response('请提供房间名 (例如 ?roomName=你的房间码)', { status: 400 });
 	},
+
+	async scheduled(controller, env, ctx): Promise<undefined> {
+		ctx.waitUntil(executeCleanup(env))
+		console.log('定时清理任务触发');
+	}
 } satisfies ExportedHandler<Env>;
